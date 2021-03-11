@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+
+<head>
+    <script src="jquery-3.5.1.min.js"></script>
+    <link rel="stylesheet" src="bootstrap.min.css"></script>
+</head>
+<body>
+    <h1>Shell</h1>
+    <div class="Inventory">
+        Contenu du sac :
+        <ul id="inventoryId">
+            Aucun objet
+        </ul>
+    </div>
+    <div class="Stats">    
+        Niveau <a class="HeroLevel">1</a>
+        <ul>
+            <li> FOR : <a class="HeroFOR">...</a> <button onClick="strUp()">+</button> -- force, affecte les dégats </li>
+            <li> DEX : <a class="HeroDEX">...</a> <button onClick="dexUp()">+</button> -- dextérité, affecte les critiques et esquives</li>
+            <li> CON : <a class="HeroCON">...</a> <button onClick="conUp()">+</button> -- constitution, affecte la vie et la defense</li>
+            <li> CHA : <a class="HeroLUCK">...</a> <button onClick="luckUp()">+</button> -- chance, affecte toutes les statistiques </li>
+            <li> XP  : <a class="HeroXP">...</a>/<a class="HeroXPnecessary">...</a> -- expérience </li>
+            <li> Dmg  : <a class="HeroDMG">...</a> -- dommages </li>
+            <li> %CC  : <a class="HeroCrit">...</a> -- chances de coup critique </li>
+        </ul>
+    </div>
+    <div class="StartPanel">
+        Choisis ton héros (entre son nom)
+        <input type="text" id="heroId">
+        <button onClick="createHero()"> Valider </button>
+        <div>
+            [<a class="HeroName">...</a>]
+        </div>
+        <br/>
+        Choisis ton enemi (entre son id)
+        <input type="number" id="foeId">
+        <ul>
+            <li>1. Sanglier</li>
+            <li>2. Ours</li>
+            <li>3. Orc</li>
+            <li>4. Demon</li>
+            <li>5. Héro de guerre</li>
+            <li>6. Dieu mineur</li>
+        </ul>
+        <div>
+            [<a class="FoeName">...</a>]
+        </div>
+        <br/>        
+        <button onClick="startFight()"> Commencer le combat </button>
+        <button onClick="store()"> Entrer dans la boutique </button>
+    </div>
+    <div class="StorePanel" style="display: none;">
+        Babioles à vendre :
+        <input type="number" id="itemId">
+        <button onClick="buy()"> Valider </button>
+        <div>
+            [<a class="StoreResponse">...</a>]
+        </div>
+        <br/>        
+        <ul id="store">
+        </ul>      
+        <br/>        
+        <button onClick="startFight()"> Commencer le combat </button>
+        <button onClick="home()"> Revenir à la selection du monstre </button>
+    </div>
+    <div class="CombatPanel" style="display: none;">
+        <div class="HeroCharacteristics">
+            <div>Vous êtes <a class="HeroName">...</a>, vous avez <a class="HeroHP" style="font-weight: bold;">...</a>/<a class="HeroMaxHP" style="font-weight: bold;">...</a> points de vie</div>
+        </div>
+        <div>Votre ennemi, un <a class="FoeName">...</a> a <a class="FoeHP" style="font-weight: bold;">...</a>/<a class="FoeMaxHP" style="font-weight: bold;">...</a> points de vie</div>
+        Que voulez vous faire ? 
+        <input type="number" id="actionId">
+        <button onClick="ValidateAction()"> Valider </button>
+        <ul>
+            <li>1. Attaquer</li>
+            <li>2. Défendre</li>
+            <li>3. Potion</li>
+            <li>4. Fuir</li>
+        </ul>
+    </div>
+    <div class="LogPanel">
+        Logs: 
+        <ul id="logs">
+
+        </ul>
+    </div>
+
+</body>
+<script type="text/javascript">
+
+// --------------------- Start Variables
+var foeId = null;
+var foeMaxHP = 0;
+var foeHP = 0;
+var foeATK = 0;
+var foeXpGiven = 0;
+var foeGoldGiven = 0;
+var foeSpecialUse = 0; // number of times foe can use special
+var foePrecision = 0; // To avoid full dodge runs
+
+var heroName = 100;
+var heroMaxHP = 100;
+var heroHP = 100;
+var heroBonusHP = 0;
+var heroBonusDEX = 0;
+var heroBonusFOR = 0;
+var heroATK = 10;
+var heroBonusATK = 0;
+var heroTempBonusATK = 0;
+var heroBonusDEF = 0;
+var heroTempBonusDEF = 0;
+//
+var level = 1;
+var experience = 0;
+var experienceNecessaryToUp = 100;
+var experienceRatio = 1.06;
+var DEX = 1;
+var FOR = 1;
+var LUCK = 1;
+var CON = 1;
+//
+var itemsStore = [{
+    name : "Potion",
+    quantity : 10,
+    price : 30,   
+    id : 1
+}, 
+{
+    name : "Épée",
+    quantity : 1,
+    price : 80,
+    effect : {
+        prop : "heroBonusATK",
+        value : 2
+    },
+    id : 2
+},
+{
+    name : "Bouclier",
+    quantity : 1,
+    price : 80,
+    effect : {
+        prop : "heroBonusDEF",
+        value : 2
+    },
+    id : 3
+},
+{
+    name : "Coeur de dryade",
+    quantity : 2,
+    price : 300,
+    effect : {
+        prop : "heroBonusHP",
+        value : 50
+    },
+    id : 4
+},
+{
+    name : "Épée étincelante",
+    quantity : 1,
+    price : 1000,
+    effect : {
+        prop : "heroBonusATK",
+        value : 20
+    },
+    id : 5
+},
+{
+    name : "Bouclier Lourd",
+    quantity : 1,
+    price : 800,
+    effect : {
+        prop : "heroBonusDEF",
+        value : 20
+    },
+    id : 6
+},
+{
+    name : "Excalibur",
+    quantity : 1,
+    price : 8000,
+    effect : {
+        prop : "heroBonusATK",
+        value : 200
+    },
+    id : 7
+},
+{
+    name : "Gants divins",
+    quantity : 1,
+    price : 2000,
+    effect : {
+        prop : "heroBonusDEX",
+        value : 10
+    },
+    id : 8
+},
+{
+    name : "Casque léger",
+    quantity : 1,
+    price : 800,
+    effect : {
+        prop : "heroBonusHP",
+        value : 40
+    },
+    id : 9
+},
+{
+    name : "Armure épaisse",
+    quantity : 1,
+    price : 800,
+    effect : {
+        prop : "heroBonusHP",
+        value : 120
+    },
+    id : 10
+},
+{
+    name : "Bottes de force",
+    quantity : 1,
+    price : 800,
+    effect : {
+        prop : "heroBonusFOR",
+        value : 4
+    },
+    id : 11
+},
+];
+var itemsHero = [{
+    name: "Pièces d'or",
+    quantity : 5,
+    id : 0
+}];
+
+// ------------------------------------ Init
+
+$(document).ready(function(){
+    syncStats()
+    SyncInventory();
+    SyncStore();
+})
+// ----------------------------------- Level up
+
+function LevelUp(){
+        experience -= experienceNecessaryToUp;
+        level++;
+        experienceNecessaryToUp *= experienceRatio;
+        experienceNecessaryToUp = Math.floor(experienceNecessaryToUp)
+}
+
+function strUp(){
+    if(experience - experienceNecessaryToUp >= 0){
+        LevelUp();
+        FOR++;       
+        syncStats()
+    }
+}
+
+function dexUp(){
+    if(experience - experienceNecessaryToUp >= 0){
+        LevelUp();
+        DEX++;
+        syncStats()
+    }
+}
+
+function conUp(){
+    if(experience - experienceNecessaryToUp >= 0){
+        LevelUp();
+        CON++;
+        heroMaxHP = heroMaxHP + 10;
+        heroHP = heroMaxHP;
+        syncStats()
+    }
+}
+
+function luckUp(){
+    if(experience - experienceNecessaryToUp  >= 0){
+        LevelUp();
+        LUCK++;
+        heroMaxHP = heroMaxHP + 5;
+        heroHP = heroMaxHP;
+        syncStats()
+    }
+}
+
+function syncStats(){
+    $(".HeroHP").each(function(){
+        $(this).html(heroHP)
+    });
+    $(".HeroMaxHP").each(function(){
+        $(this).html(heroMaxHP+heroBonusHP)
+    }); 
+    $(".HeroXPnecessary").each(function(){
+        $(this).html(experienceNecessaryToUp)
+    }); 
+
+    $(".HeroXP").each(function(){
+        $(this).html(experience)
+    }); 
+    $(".HeroCON").each(function(){
+        $(this).html(CON)
+    }); 
+    $(".HeroFOR").each(function(){
+        if(heroBonusFOR > 0)
+            $(this).html(FOR + " ( + "+heroBonusFOR+") ")
+        else
+            $(this).html(FOR)
+    }); 
+    $(".HeroDEX").each(function(){
+        if(heroBonusDEX > 0)
+            $(this).html(DEX + " ( + "+heroBonusDEX+") ")
+        else
+            $(this).html(DEX)
+    }); 
+    $(".HeroLUCK").each(function(){
+        $(this).html(LUCK)
+    }); 
+    $(".HeroLevel").each(function(){
+        $(this).html(level)
+    }); 
+    $(".HeroDMG").each(function(){
+        console.log("hello");
+        var dmg = GetDamageBase();
+        $(this).html(dmg)
+    }); 
+    $(".HeroCrit").each(function(){
+        var crit = GetCritBase();
+        $(this).html(crit)
+    }); 
+}
+
+// ----------------------------------- Panels
+function startFight(){
+    $(".CombatPanel").each(function(){
+        $(this).css('display', 'block')
+    });
+    $(".StartPanel").each(function(){
+        $(this).css('display', 'none')
+    });
+    $(".StorePanel").each(function(){
+        $(this).css('display', 'none')
+    });
+    ValidateFoe();
+    applyItemsBonuses();
+    
+    heroHP += heroBonusHP;
+    syncStats();
+    //initHero();
+}
+
+function store(){
+    $(".CombatPanel").each(function(){
+        $(this).css('display', 'none')
+    });
+    $(".StartPanel").each(function(){
+        $(this).css('display', 'none')
+    });
+    $(".StorePanel").each(function(){
+        $(this).css('display', 'block')
+    });
+}
+
+function home(){
+    $(".CombatPanel").each(function(){
+        $(this).css('display', 'none')
+    });
+    $(".StartPanel").each(function(){
+        $(this).css('display', 'block')
+    });
+    $(".StorePanel").each(function(){
+        $(this).css('display', 'none')
+    });
+}
+// ----------------------------------- Utils
+function log(message){
+    $("#logs").prepend("<li>"+message+"</li>")
+}
+
+// ----------------------------------- Inventory
+
+function SyncInventory()
+{    
+    $("#inventoryId").html("");
+    itemsHero.forEach(element => {
+            $("#inventoryId").append("<li>" +element.quantity+ " " +element.name +"</li>")
+    });
+}
+
+//------------------------------------ Start
+function createHero(){
+    var name = $("#heroId").val();
+    heroName = name;
+    $(".HeroName").each(function(){
+        $(this).html(heroName)
+    });
+}
+
+function applyItemsBonuses(withSyncStats = true, withLogs = true){
+    heroBonusDEF = 0;
+    heroBonusATK = 0;
+    heroBonusHP = 0;
+    heroBonusDEX = 0;
+    heroBonusFOR = 0;
+    itemsHero.forEach(element => {
+        //debugger;
+        if(element.effect != undefined){            
+            if(element.effect.prop == "heroBonusATK" ){
+                heroBonusATK += element.effect.value;
+                if(withLogs)
+                    log("votre " + element.name + " ajoute " +element.effect.value+" ATK." )
+            }
+            if(element.effect.prop == "heroBonusDEF"){
+                heroBonusDEF += element.effect.value
+                if(withLogs)
+                    log("votre " + element.name + " ajoute " +element.effect.value+" DEF." )
+            }
+            if(element.effect.prop == "heroBonusHP"){
+                heroBonusHP += element.effect.value * element.quantity 
+                if(withLogs)
+                    log("votre " + element.name + " ajoute " +element.effect.value+"*"+element.quantity +" PV." )
+            }
+            if(element.effect.prop == "heroBonusDEX"){
+                heroBonusDEX += element.effect.value
+                if(withLogs)
+                    log("votre " + element.name + " ajoute " +element.effect.value+" DEX." )
+            }
+            if(element.effect.prop == "heroBonusFOR"){
+                heroBonusFOR += element.effect.value
+                if(withLogs)
+                    log("votre " + element.name + " ajoute " +element.effect.value+" FOR." )
+            }
+        } else{
+            if(withLogs)
+                    log(element.name + " n'a pas d'effet.")
+        }
+    });
+    if(withSyncStats){
+        syncStats();
+    }
+}
+
+function ValidateFoe(){
+    console.log("start");
+    var actionId = $("#foeId").val();
+    
+    console.log($("#foeId"));    
+    foeId = actionId;
+    switch(actionId){
+        case "1": 
+            foeName = "Sanglier";
+            foeMaxHP = 30;
+            foeHP = foeMaxHP;
+            foeATK = 10;
+            foeXpGiven = 100;
+            foeGoldGiven = 10;
+            foeSpecialUse = 0;
+            foePrecision = 0;
+            break;
+        case "2" :
+            foeName = "Ours";
+            foeATK = 30;
+            foeMaxHP = 50;
+            foeXpGiven = 300;
+            foeGoldGiven = 30;
+            foeHP = foeMaxHP;
+            foeSpecialUse = 0;
+            foePrecision = 10;
+            break;
+        case "3" :
+            foeName = "Orc";
+            foeATK = 50;
+            foeMaxHP = 90;
+            foeHP = foeMaxHP;
+            foeXpGiven = 1500;
+            foeGoldGiven = 150;
+            foeSpecialUse = 1;
+            foePrecision = 20;
+            break;
+        case "4" :
+            foeName = "Démon";
+            foeATK = 80;
+            foeMaxHP = 250;
+            foeHP = foeMaxHP;
+            foeXpGiven = 5000;
+            foeGoldGiven = 500;
+            foeSpecialUse = 1;
+            foePrecision = 30;
+            break;
+        case "5" :
+            foeName = "Héro de guerre";
+            foeATK = 80;
+            foeMaxHP = 500;
+            foeHP = foeMaxHP;
+            foeXpGiven = 15000;
+            foeGoldGiven = 1500;
+            foeSpecialUse = 1;
+            foePrecision = 40;
+            break;
+        case "6" :
+            foeName = "Dieu mineur";
+            foeATK = 200;
+            foeMaxHP = 3000;
+            foeHP = foeMaxHP;
+            foeXpGiven = 150000;
+            foeGoldGiven = 10000;
+            foeSpecialUse = 5;
+            foePrecision = 50;
+            break;
+        default: 
+            foeName = "pantin";
+            foeATK = 1;
+            foeMaxHP = 10;
+            foeHP = foeMaxHP;            
+            foeXpGiven = 1;
+            foeGoldGiven = 0;
+            foeSpecialUse = 0;
+            break;
+    }
+    $(".FoeName").each(function(){
+        $(this).html(foeName)
+    });
+    $(".FoeHP").each(function(){
+        $(this).html(foeHP)
+    });
+    $(".FoeATK").each(function(){
+        $(this).html(foeATK)
+    });    
+    $(".FoeMaxHP").each(function(){
+        $(this).html(foeMaxHP)
+    });
+    
+    log("Votre héro s'appellera "+heroName)
+    log("Vous affronterez "+foeName)
+}
+// ------------------------------------- Store
+
+function GetGold(){ // id of gold is 0
+    var gold = 0;
+    itemsHero.forEach(element => {
+        if(element.id == 0){
+            gold = element.quantity;
+        }
+    });
+    return gold;
+}
+
+function RemoveGold(qty){ // id of gold is 0
+    itemsHero.forEach(element => {
+        if(element.id == 0){
+            element.quantity -= qty;
+        }
+    });
+    return 0;
+}
+
+function buy(){
+    var itemId = $("#itemId").val();
+    var item = GetStoreItemById(itemId);
+    var gold = GetGold();
+    if(item.price <= GetGold()){
+        log("Vous avez acheté l'objet");
+        RemoveGold(item.price);
+        $(".StoreResponse").each(function(){
+            $(this).html("Vous avez acheté l'objet "+item.name);
+        });
+        TransferItemFromStoreToInventory(item);
+        syncStats();     
+    }    
+}
+
+function TransferItemFromStoreToInventory(item){
+    AddLootToInventory(item);
+    // Remove from store
+    itemsStore.forEach(element => {
+        if(element.id == item.id){
+            element.quantity--;
+        }
+    });
+    SyncInventory();
+    SyncStore();
+}
+
+function AddLootToInventory(item, quantity = 1){
+    var isAlreadyInInventory = false;
+    itemsHero.forEach(element => {
+        if(element.id == item.id){
+            element.quantity += quantity;
+            isAlreadyInInventory = true
+        }
+    });
+    if(!isAlreadyInInventory){
+        var hItem = {
+            name : item.name,
+            quantity : quantity,
+            effect : item.effect,
+            id : item.id
+        }
+        itemsHero.push(hItem); 
+    }
+}
+
+function GetStoreItemById(id){
+    var elementToreturn = null;
+    itemsStore.forEach(element => {
+        if(element.id == id){
+            elementToreturn = element;
+        }
+    });
+    return elementToreturn;
+}
+
+
+function SyncStore(){
+    $("#store").html("");
+    itemsStore.forEach(element => {
+        if(element.quantity > 0){
+            $("#store").append("<li>"+ element.id + ". " +element.name + " - " + element.price +" pièces </li>")
+        } 
+    });
+}
+
+function GetDamageBase(){
+    applyItemsBonuses(false, false);
+    var damageBase = Math.floor(heroATK+heroBonusATK+heroTempBonusATK+2*(FOR+heroBonusFOR) + LUCK/2+ DEX+heroBonusDEX);
+    var damage10percent = Math.floor(damageBase*10/100);
+    var damageBaseMax = damageBase+damage10percent/2;
+    var damageBaseMin = damageBase-damage10percent/2;     
+    return "" + Math.floor(damageBaseMin) + " - " + Math.floor(damageBaseMax);
+}
+
+function GetCritBase(){
+    applyItemsBonuses(false, false);
+    var critChance = DEX+heroBonusDEX+Math.floor(LUCK/2)        
+    return critChance;
+}
+
+// ------------------------------------- Fight
+
+function ValidateAction(){
+    var actionId = $("#actionId").val();
+    switch(actionId){
+        case "1": 
+            var damageDealtByHero = Math.floor(heroATK+heroBonusATK+heroTempBonusATK+2*(FOR+heroBonusFOR) + LUCK/2+ DEX+heroBonusDEX);
+            var damage10percent = Math.floor(damageDealtByHero*10/100);
+            var damagerndmizer = Math.floor(Math.random()*damage10percent-damage10percent/2);
+            damageDealtByHero += damagerndmizer;
+            var isCritical = Math.random()*100 < (DEX+heroBonusDEX+Math.floor(LUCK/2));
+            if(isCritical){
+                damageDealtByHero = Math.floor(2*damageDealtByHero);
+                log("COUP CRITIQUE");
+            } 
+            foeHP -= damageDealtByHero
+            log(heroName+" attaque, il inflige " + damageDealtByHero +" dégats.")
+            
+            break;
+        case "2" :
+            heroTempBonusDEF += 2 + Math.floor(CON/2);
+            log(heroName+" se défends, il devient plus résistant.")
+            break;
+        case "3" :
+            var lifeHealedByHero = 20 + 3*LUCK
+            heroHP += lifeHealedByHero
+            if(heroHP > heroMaxHP + heroBonusHP){
+                heroHP = heroMaxHP + heroBonusHP;
+            }
+            log(heroName+" se soigne, il gagne " + lifeHealedByHero +" points de vie.")
+            break;
+        case "4" :
+            alert("GAME OVER");
+            location.reload();            
+            break;
+        default: 
+            
+        break;
+    }
+    $(".FoeHP").each(function(){
+        $(this).html(foeHP)
+    });
+    
+    $(".heroTempBonusDEF").each(function(){
+        $(this).html(heroTempBonusDEF)
+    });
+    $(".HeroHP").each(function(){
+        $(this).html(heroHP)
+    });
+
+    if(foeHP <= 0){
+        gameOver(true);
+    } else {
+        FoeActions();
+        if(heroHP <= 0){
+            gameOver(false);
+    }
+    }
+    
+}
+
+function gameOver(victory){
+    if(victory){
+        log("Félicitations ! Vous avez battu "+ foeName)
+        log("Vous gagnez "+ foeXpGiven+" XP")
+        log("Vous gagnez "+ foeGoldGiven)
+        experience += foeXpGiven;
+        AddLootToInventory({
+            name: "Pièces d'or",
+            quantity : 1,
+            id : 0
+        }, foeGoldGiven)
+        // reset temp stats
+        heroTempBonusDEF = 0;
+        heroTempBonusATK = 0;
+        heroBonusHP = 0;
+        heroHP = heroMaxHP + heroBonusHP;   
+             
+        home();
+        syncStats();
+        SyncInventory();
+    }
+    else{
+        log("Dommage vous avez perdu ! ");
+        reset();
+        home();
+    }
+}
+
+function reset(){
+    foeId = null;
+    foeName= "..."
+    foeMaxHP = 0;
+    foeHP = 0;
+    foeATK = 0;
+    heroName = "...";
+    heroMaxHP = 100;
+    heroBonusDEF = 0;
+    heroBonusATK = 0;
+    heroBonusHP = 0;
+    heroTempBonusATK = 0;
+    heroTempBonusDEF = 0;
+    heroHP = 100;
+    heroATK = 10;
+    experience = 1000;
+    experienceNecessaryToUp = 100;
+    level = 1;
+    CON = 1;
+    FOR = 1;
+    DEX = 1;
+    LUCK = 1;
+    syncStats();
+    SyncInventory();
+}
+
+function FoeSpecial(){
+    log("Action speciale !")
+    foeSpecialUse--;
+    if(foeId == 3){
+        log("L'orc ennemi devient enragé");
+        log("Sa force est multipliée par 2");
+        foeATK *= 2;
+    } 
+    else if(foeId == 4){
+        log("Le démon vous frappe sournoisement dans le dos");
+        log("Les dégats ne peuvent être bloqués ni esquivés");
+        heroHP -= foeATK;
+    }
+    else if(foeId == 5){
+        log("Le héros de guerre sort une deuxième lame de son fourreau");
+        log("Sa force est multipliée par 3");
+        foeATK *= 3;
+    }
+    else if(foeId == 6){
+        log("Le dieu mineur vous maudit");
+        heroTempBonusDEF -=20;
+        heroTempBonusATK -=20;
+        log("Votre attaque baisse de 20");
+        log("Votre défense baisse de 20");  
+    }
+    FoeActions(true);
+}
+
+function FoeActions(specialAlreadyExecuted = false){
+    var actionFoe = 1; 
+    if(foeHP < foeMaxHP/2 && foeSpecialUse > 0 && !specialAlreadyExecuted)
+    {        
+        actionFoe = 2;
+    }
+    switch(actionFoe){
+        case 1: 
+            var damage = Math.floor(foeATK-heroBonusDEF-heroTempBonusDEF-CON-Math.floor(LUCK/2));
+            if(damage < foeATK/4){ // cannot reduce damage more than 75% of initial foe ATK
+                damage = Math.floor(foeATK/4);
+            }
+            var avoidCap = 2*(DEX+heroBonusDEX)+LUCK;
+            // if(avoidCap > 90){ // cannot have more than 90% chance of avoiding
+            //     avoidCap = 90
+            // }
+            var heroAvoid = Math.random()*100 < avoidCap-foePrecision;
+            if(heroAvoid){
+                damage = 0;
+                log("ESQUIVE !");
+            }
+            if(damage < 0){
+                damage = 0;
+            }
+            heroHP -= damage;   
+            log(foeName+" attaque, il inflige " + damage + " (base :"+ foeATK + ") dégats.");
+                 
+            break;
+        case 2 : // foe special attack
+            FoeSpecial();
+            break;
+        default: 
+            break;
+    }
+    
+    $(".HeroHP").each(function(){
+        $(this).html(heroHP)
+    });
+    $(".foeHP").each(function(){
+        $(this).html(foeHP)
+    });
+    $(".foeATK").each(function(){
+        $(this).html(foeATK)
+    });
+}
+
+
+
+</script>
